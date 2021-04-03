@@ -96,9 +96,7 @@ def compute_transformation_matrix(img, landmark, normalize, target_face_scale=1.
     affine.estimate(target_pts, landmark)
 
     return affine.params
-
-
-def show_detection(image, box, landmark):
+def show_detection(image, box, landmark):#展示检测矩形框
     plt.imshow(image)
     print(box[2] - box[0])
     plt.gca().add_patch(
@@ -126,9 +124,10 @@ def affine2theta(affine, input_w, input_h, target_w, target_h):
     theta[1, 2] = (2 * param[1, 2] + param[1, 0] * input_h + param[1, 1] * input_w) / target_w - 1
     return theta
 
-
+"""
+此函数的目的在于从照片中找出人脸 并裁剪保存
+"""
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", type=str, default="/home/jingliao/ziyuwan/celebrities", help="input")
     parser.add_argument(
@@ -145,38 +144,38 @@ if __name__ == "__main__":
     os.makedirs(save_url, exist_ok=True)
 
     face_detector = dlib.get_frontal_face_detector()
-    landmark_locator = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
-
+    landmark_locator = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")#人脸识别68个特征点  返回68个关键点的位置
     count = 0
-
     map_id = {}
-    for x in os.listdir(url):
+    for x in os.listdir(url):#os.listdir(url)返回url文件夹下的列表
         img_url = os.path.join(url, x)
-        pil_img = Image.open(img_url).convert("RGB")
-
+        pil_img = Image.open(img_url).convert("RGB")#原生为4通道
         image = np.array(pil_img)
-
         start = time.time()
         faces = face_detector(image)
+
         done = time.time()
 
         if len(faces) == 0:
-            print("Warning: There is no face in %s" % (x))
+            print("Warning: There is no face in %s" % (x))#没有识别到人脸
             continue
-
         print(len(faces))
-
         if len(faces) > 0:
             for face_id in range(len(faces)):
                 current_face = faces[face_id]
-                face_landmarks = landmark_locator(image, current_face)
-                current_fl = search(face_landmarks)
-
-                affine = compute_transformation_matrix(image, current_fl, False, target_face_scale=1.3)
-                aligned_face = warp(image, affine, output_shape=(256, 256, 3))
+                face_landmarks = landmark_locator(image, current_face)#记录关键点的位置
+                """
+        功能：定位人脸关键点
+        参数：img：一个numpy ndarray，包含8位灰度或RGB图像
+　　    　box：开始内部形状预测的边界框
+           返回值：68个关键点的位置
+        """
+                current_fl = search(face_landmarks)#将关键点的位置导入，获得人脸的眼鼻嘴 位置
+                affine = compute_transformation_matrix(image, current_fl, False, target_face_scale=1.3)#计算后的人脸位置
+                aligned_face = warp(image, affine, output_shape=(256, 256, 3))#截取人脸矩形图像
+                #神经网络的正向传播中进行的矩阵乘积运算
                 img_name = x[:-4] + "_" + str(face_id + 1)
                 io.imsave(os.path.join(save_url, img_name + ".png"), img_as_ubyte(aligned_face))
-
         count += 1
 
         if count % 1000 == 0:

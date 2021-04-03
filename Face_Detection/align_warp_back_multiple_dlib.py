@@ -39,7 +39,7 @@ def calculate_cdf(histogram):
     return normalized_cdf
 
 
-def calculate_lookup(src_cdf, ref_cdf):
+def calculate_lookup(src_cdf, ref_cdf):#将原图像中对应的RGB色彩用ref中的替换
     """
     This method creates the lookup（检查） table
     :param array src_cdf: The cdf for the source image
@@ -49,7 +49,7 @@ def calculate_lookup(src_cdf, ref_cdf):
     """
     lookup_table = np.zeros(256)#256个0组成的数组
     lookup_val = 0
-    #检查每个src像素点  遍历所有ref  如果出现ref中有大于src的 则记录相应的位置
+    #当用遍历src_cdf时 找到第一个大于ref_cdf值大于src_cdf 值的j 并用lookup_val记录j    最终形如lookup_table[i] = j
     for src_pixel_val in range(len(src_cdf)):
         lookup_val
         for ref_pixel_val in range(len(ref_cdf)):
@@ -59,7 +59,11 @@ def calculate_lookup(src_cdf, ref_cdf):
         lookup_table[src_pixel_val] = lookup_val
     return lookup_table
 
+"""
+  柱状图匹配   反悔映射后的图像
 
+  查找表的用途在于  将原图片的对应RGB值转为表中值 即一对一映射关系
+"""
 def match_histograms(src_image, ref_image):
     """
     This method matches the source image histogram to the
@@ -99,12 +103,12 @@ def match_histograms(src_image, ref_image):
 
     # Use the lookup function to transform the colors of the original 使用查找函数转换原始文件的颜色
     # source image
-    blue_after_transform = cv2.LUT(src_b, blue_lookup_table)
+    blue_after_transform = cv2.LUT(src_b, blue_lookup_table)#使用查找表中的值填充输出数组
     green_after_transform = cv2.LUT(src_g, green_lookup_table)
     red_after_transform = cv2.LUT(src_r, red_lookup_table)
 
     # Put the image back together
-    image_after_matching = cv2.merge([blue_after_transform, green_after_transform, red_after_transform])
+    image_after_matching = cv2.merge([blue_after_transform, green_after_transform, red_after_transform])#最终实现
     image_after_matching = cv2.convertScaleAbs(image_after_matching)
 
     return image_after_matching
@@ -166,8 +170,8 @@ def compute_inverse_transformation_matrix(img, landmark, normalize, target_face_
 
     return affine
 
-
-def show_detection(image, box, landmark):
+#展现检测结果
+def show_detection(image, box, landmark):#box[1]x位置
     plt.imshow(image)
     print(box[2] - box[0])
     plt.gca().add_patch(
@@ -175,7 +179,7 @@ def show_detection(image, box, landmark):
             (box[1], box[0]), box[2] - box[0], box[3] - box[1], linewidth=1, edgecolor="r", facecolor="none"
         )
     )
-    plt.scatter(landmark[0][0], landmark[0][1])
+    plt.scatter(landmark[0][0], landmark[0][1])#散点图
     plt.scatter(landmark[1][0], landmark[1][1])
     plt.scatter(landmark[2][0], landmark[2][1])
     plt.scatter(landmark[3][0], landmark[3][1])
@@ -196,20 +200,22 @@ def affine2theta(affine, input_w, input_h, target_w, target_h):
     return theta
 
 
-def blur_blending(im1, im2, mask):
+def blur_blending(im1, im2, mask):#模糊混合
 
     mask *= 255.0
 
-    kernel = np.ones((10, 10), np.uint8)
-    mask = cv2.erode(mask, kernel, iterations=1)
+    kernel = np.ones((10, 10), np.uint8)#ones(shape, dtype=None, order='C')
+    """腐蚀操作
+    腐蚀操作原理：存在一个kernel，比如(3, 3)，在图像中不断的平移，在这个9方框中，哪一种颜色所占的比重大，9个方格中将都是这种颜色
+    """
+    mask = cv2.erode(mask, kernel, iterations=1)#cv2.erode(src, kernel, iteration)src表示的是输入图片，kernel表示的是方框的大小，iteration表示迭代的次数
 
-    mask = Image.fromarray(mask.astype("uint8")).convert("L")
+    mask = Image.fromarray(mask.astype("uint8")).convert("L")#灰度图像
     im1 = Image.fromarray(im1.astype("uint8"))
     im2 = Image.fromarray(im2.astype("uint8"))
 
-    mask_blur = mask.filter(ImageFilter.GaussianBlur(20))
+    mask_blur = mask.filter(ImageFilter.GaussianBlur(20))#用一个模板（或称卷积、掩模）扫描图像中的每一个像素，用模板确定的邻域内像素的加权平均灰度值去替代模板中心像素点的值。
     im = Image.composite(im1, im2, mask)
-
     im = Image.composite(im, im2, mask_blur)
 
     return np.array(im) / 255.0
@@ -228,13 +234,15 @@ def blur_blending_cv2(im1, im2, mask):
     im = im1 * mask_blur + (1 - mask_blur) * im2
 
     im /= 255.0
-    im = np.clip(im, 0.0, 1.0)
-
+    """
+    参数说明
+a : 输入的数组
+a_min: 限定的最小值 也可以是数组 如果为数组时 shape必须和a一样
+a_max:限定的最大值 也可以是数组 shape和a一样
+out：剪裁后的数组存入的数组
+    """
+    im = np.clip(im, 0.0, 1.0)#裁剪掉范围外的值
     return im
-
-
-# def Poisson_blending(im1,im2,mask):
-
 
 #     Image.composite(
 def Poisson_blending(im1, im2, mask):
